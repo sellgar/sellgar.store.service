@@ -8,7 +8,7 @@ import { SnapshotEventService } from './snapshot-event.service';
 @Injectable()
 export class CatalogSyncService {
   constructor(
-    @Inject('PRODUCT_V2_COMMAND_SERVICE') private readonly productClient: ClientProxy,
+    @Inject('PRODUCT_COMMAND_SERVICE') private readonly productClient: ClientProxy,
     private readonly snapshots: SnapshotEventService,
   ) {}
   async synchronize(productUuid: string) {

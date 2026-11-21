@@ -46,7 +46,7 @@ describe('Product snapshot recovery in PostgreSQL', () => {
     plainToInstance(IntegrationEventDto, {
       eventUuid: randomUUID(),
       eventType: 'product.updated',
-      producer: 'product_srv_v2',
+      producer: 'product_srv',
       aggregateType: 'product',
       aggregateId: productUuid,
       aggregateVersion: version,

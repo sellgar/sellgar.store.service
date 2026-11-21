@@ -23,7 +23,7 @@ describe(SnapshotEventController.name, () => {
     { synchronize } as unknown as CatalogSyncService,
   );
   const event = {
-    producer: 'product_srv_v2',
+    producer: 'product_srv',
     aggregateType: 'product',
     aggregateId: '11111111-1111-4111-8111-111111111111',
     schemaVersion: 3,

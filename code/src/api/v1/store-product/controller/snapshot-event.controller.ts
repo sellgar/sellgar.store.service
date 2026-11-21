@@ -46,7 +46,7 @@ export class SnapshotEventController {
 
       if (
         status === 'parked' &&
-        event.producer === 'product_srv_v2' &&
+        event.producer === 'product_srv' &&
         event.aggregateType === 'product' &&
         event.schemaVersion === 3
       ) {

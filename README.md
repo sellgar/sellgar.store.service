@@ -1,7 +1,7 @@
 # sellgar.store.service
 
 Store владеет связями магазина с каталогом, учетными записями, ценами и остатками.
-Каталогом владеет product_srv_v2, информацией магазина — shop_srv.
+Каталогом владеет product_srv, информацией магазина — shop_srv.
 
 ## Модель
 
@@ -61,7 +61,7 @@ RMQ patterns:
 ```json
 [
   {
-    "variantUuid": "UUID варианта из product_srv_v2",
+    "variantUuid": "UUID варианта из product_srv",
     "showing": true,
     "records": [
       { "currentPrice": { "value": "1500.00", "currencyCode": "RUB" }, "article": "BLUE-S", "order": 0, "clarifications": [{ "value": "S евростандарт" }] },
@@ -99,7 +99,7 @@ Nest-контекст с двумя RMQ microservices: очередь коман
 прежний claim с FOR UPDATE SKIP LOCKED.
 События подтверждаются ack после завершения inbox-транзакции.
 
-Store принимает product.created/product.updated только от product_srv_v2,
+Store принимает product.created/product.updated только от product_srv,
 schemaVersion=3. Shop использует текущие shop.created/shop.updated.
 Дубликаты и старые версии игнорируются через inbox; разрыв версий создает sync_issue.
 store.catalog.synchronize выполняет единственный authoritative read, разрешает
@@ -128,7 +128,7 @@ yarn migration:show
 yarn start:dev
 ```
 
-Конфигурация описана в .env.example. PRODUCT_V2_COMMAND_QUEUE должен совпадать с
+Конфигурация описана в .env.example. PRODUCT_COMMAND_QUEUE должен совпадать с
 очередью текущего Product service. Доменные команды остаются в RMQ; внутренний `/health` проверяет БД и оба consumer.
 
 ## Проверка

@@ -5,7 +5,7 @@ export class ProductSnapshotModel {
   @PrimaryColumn('uuid', { name: 'product_uuid' })
   productUuid: string;
 
-  @Column({ name: 'source_producer', type: 'varchar', length: 128, default: 'product_srv_v2' })
+  @Column({ name: 'source_producer', type: 'varchar', length: 128, default: 'product_srv' })
   sourceProducer: string;
 
   @Column({ name: 'source_version', type: 'int' })

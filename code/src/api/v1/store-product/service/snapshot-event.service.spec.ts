@@ -30,7 +30,7 @@ describe(SnapshotEventService.name, () => {
     eventUuid: '33333333-3333-4333-8333-333333333333',
     eventType: 'product.updated',
     schemaVersion: 3,
-    producer: 'product_srv_v2',
+    producer: 'product_srv',
     aggregateType: 'product',
     aggregateId: productUuid,
     aggregateVersion: 2,
@@ -48,7 +48,7 @@ describe(SnapshotEventService.name, () => {
     jest.clearAllMocks();
     manager.findOne.mockImplementation(async (model: unknown) => {
       if (model === InboxEventModel) return null;
-      if (model === ProductSnapshotModel) return { sourceProducer: 'product_srv_v2', sourceVersion: 1 };
+      if (model === ProductSnapshotModel) return { sourceProducer: 'product_srv', sourceVersion: 1 };
       return null;
     });
     manager.upsert.mockResolvedValue(undefined);

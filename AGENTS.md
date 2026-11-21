@@ -70,7 +70,7 @@ yarn build
 
 Изменения схемы выполняются явными миграциями, synchronize отключен. Сверяйте
 контракты и примеры команд с README.md. Product snapshot принимает только
-product_srv_v2 schemaVersion=3. Bootstrap: один Nest-контекст с двумя RMQ-очередями и внутренним health HTTP на 8080.
+product_srv schemaVersion=3. Bootstrap: один Nest-контекст с двумя RMQ-очередями и внутренним health HTTP на 8080.
 OutboxModule из @sellgar/outbox подключается один раз в ApiV1Module. Общий пакет
 в code/library/sellgar.outbox.library владеет writer, repository, relay, retry, timeout
 и метриками. В сервисе остаются STORE_OUTBOX_OPTIONS и доменный StoreEventRepository,

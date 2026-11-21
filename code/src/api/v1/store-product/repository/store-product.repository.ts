@@ -82,7 +82,7 @@ export class StoreProductRepository {
       where: { productUuid },
       lock: { mode: 'pessimistic_read' },
     });
-    if (!product || product.sourceProducer !== 'product_srv_v2' || product.status !== 'active')
-      throw new BadRequestException('Product v2 snapshot is missing or archived');
+    if (!product || product.sourceProducer !== 'product_srv' || product.status !== 'active')
+      throw new BadRequestException('Product snapshot is missing or archived');
   }
 }

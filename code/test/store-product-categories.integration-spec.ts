@@ -66,7 +66,7 @@ describe('Store product category assignments in PostgreSQL', () => {
       eventUuid: randomUUID(),
       eventType: 'product.updated',
       schemaVersion: 3,
-      producer: 'product_srv_v2',
+      producer: 'product_srv',
       aggregateType: 'product',
       aggregateId: uuid,
       aggregateVersion: version,

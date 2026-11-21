@@ -14,7 +14,7 @@ import { STORE_OUTBOX_OPTIONS } from '../../integration/outbox/store-outbox.opti
       isGlobal: true,
       clients: [
         {
-          name: 'PRODUCT_V2_COMMAND_SERVICE',
+          name: 'PRODUCT_COMMAND_SERVICE',
           imports: [ConfigModule],
           inject: [ConfigService],
           useFactory: (config: ConfigService) => ({
@@ -28,7 +28,7 @@ import { STORE_OUTBOX_OPTIONS } from '../../integration/outbox/store-outbox.opti
                   password: config.get('AMQP_PASSWORD'),
                 },
               ],
-              queue: config.getOrThrow('PRODUCT_V2_COMMAND_QUEUE'),
+              queue: config.getOrThrow('PRODUCT_COMMAND_QUEUE'),
               queueOptions: { durable: true },
               persistent: true,
             },

@@ -33,7 +33,7 @@ export class SnapshotEventService {
 
       if (
         existing?.status === 'parked' &&
-        event.producer === 'product_srv_v2' &&
+        event.producer === 'product_srv' &&
         event.aggregateType === 'product' &&
         event.schemaVersion === 3
       ) {
@@ -46,7 +46,7 @@ export class SnapshotEventService {
         status = await this.applyShopEvent(manager, event);
       } else if (
         event.aggregateType === 'product' &&
-        event.producer === 'product_srv_v2' &&
+        event.producer === 'product_srv' &&
         event.schemaVersion === 3
       ) {
         status = await this.applyProductEvent(manager, event);
@@ -95,7 +95,7 @@ export class SnapshotEventService {
     const preflightStatus = await this.checkVersion(
       manager,
       event,
-      current?.sourceProducer === 'product_srv_v2' ? current.sourceVersion : undefined,
+      current?.sourceProducer === 'product_srv' ? current.sourceVersion : undefined,
     );
 
     if (preflightStatus !== 'processed') {
@@ -107,7 +107,7 @@ export class SnapshotEventService {
       [
         {
           productUuid: event.aggregateId,
-          sourceProducer: 'product_srv_v2',
+          sourceProducer: 'product_srv',
           sourceVersion: event.aggregateVersion,
           name: payload.name,
           status: payload.status,
@@ -142,15 +142,15 @@ export class SnapshotEventService {
     await validateOrReject(payload, { whitelist: true });
     await this.dataSource.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-        `product_srv_v2:product:${payload.uuid}`,
+        `product_srv:product:${payload.uuid}`,
       ]);
       const current = await manager.findOneBy(ProductSnapshotModel, { productUuid: payload.uuid });
-      if (current?.sourceProducer === 'product_srv_v2' && current.sourceVersion > payload.version) return;
+      if (current?.sourceProducer === 'product_srv' && current.sourceVersion > payload.version) return;
       await manager.upsert(
         ProductSnapshotModel,
         {
           productUuid: payload.uuid,
-          sourceProducer: 'product_srv_v2',
+          sourceProducer: 'product_srv',
           sourceVersion: payload.version,
           name: payload.name,
           status: payload.status,
@@ -176,7 +176,7 @@ export class SnapshotEventService {
       await manager.update(
         SyncIssueModel,
         {
-          producer: 'product_srv_v2',
+          producer: 'product_srv',
           aggregateType: 'product',
           aggregateId: payload.uuid,
           receivedVersion: LessThanOrEqual(payload.version),
@@ -187,7 +187,7 @@ export class SnapshotEventService {
       await manager.update(
         InboxEventModel,
         {
-          producer: 'product_srv_v2',
+          producer: 'product_srv',
           aggregateType: 'product',
           aggregateId: payload.uuid,
           aggregateVersion: LessThanOrEqual(payload.version),
