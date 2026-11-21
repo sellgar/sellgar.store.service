@@ -1,8 +1,5 @@
 replicas: 1
-configmaps:
-- nameOverride: store-service-env
-  enabled: true
-  filename: .env
+environmentFile:
   data: |
     PORT=8080
     DATABASE_HOST=postgresql-rw

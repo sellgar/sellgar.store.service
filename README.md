@@ -241,33 +241,33 @@ yarn test:integration snapshot-recovery
 `records[].order` — неотрицательное целое, уникальное внутри оффера. Чтение всегда возвращает записи по нему, без сортировки размеров или текста уточнений. PATCH может переставлять существующие UUID, не затрагивая их остатки. Если order не передан, существующее значение сохраняется; новая запись добавляется после последней. Дубли порядка отклоняются атомарно. Миграция `AccountingRecordOrder1795000000000` заполняет начальные значения для существующих записей, не меняя их текущую последовательность. Дальше последовательностью управляет администратор.
 
 
-## CI и Kubernetes
+## CI и доставка
 
-Yarn root, `src`, `test` и `library` находятся внутри `code/`. Команды из разделов
-выше выполнять из `code/`. Dockerfile, `.github/` и `helm/` — в корне.
-`helm/values.app.yaml` содержит общую конфигурацию; `helm/dev/values.yaml` — одну
-реплику и ConfigMap `.env`. Общие templates принадлежат infrastructure/chart application.
-Prod values заполняются при подключении prod, который сейчас не развёрнут.
+Push в `development` запускает build → publish → параллельно test/migrate → deploy.
+`test` — отдельная job с unit/компонентными тестами из Docker target `tests`.
+Если тесты или миграции не прошли, deploy не запускается.
+Сборка, тесты и публикация выполняются на GitHub-hosted runners;
+migrate/deploy — на repository-scoped runner в dev VM.
+Обычная раскатка выполняется Helm с ожиданием готовности и проверкой image digest.
+Argo CD продолжает управлять платформой, но не этим приложением.
 
-Node 24 production image содержит compiled service, общую outbox-библиотеку и
-production dependencies. PostgreSQL 16 используется только в verifier stage для
-unit/integration tests. Production-image smoke запускается из корня:
-`python3 .github/scripts/smoke-image.py <image>`; он использует отдельные временные
-PostgreSQL/RabbitMQ, без рабочих volumes. Проверяются пять миграций и повторный
-запуск, snapshots/inbox, категории, цена, учётные записи, остатки, идемпотентность,
-409, FTS и outbox. Отключение проверочного RabbitMQ переводит health в 503.
+Docker targets: `application`, `tests`, `migration`.
+Миграционный образ запускает TypeORM CLI отдельной Kubernetes Job до раскатки приложения. В runtime приложения миграции автоматически не запускаются.
 
-В Kubernetes внутренний container/Service 8080; публичного Ingress нет. База/роль
-`store_srv` приходят от CloudNativePG, credentials — Secret `store-database`.
-`.env` монтируется в `/app/.env`; RabbitMQ — Secret `rabbitmq-default-user`.
-Миграционный Job запускает `node --env-file=.env node_modules/typeorm/cli.js -d
- dist/database/data-source.js migration:run` до Deployment. Synchronize отключён.
+Настройки среды хранятся в `helm/dev/values.yaml`, Secret refs — в
+`helm/values.app.yaml`. Версионный immutable ConfigMap монтируется через
+`environmentFile`; значения credentials не передаются в GitHub-hosted jobs или Git.
+Внутренний HTTP-порт — 8080, в dev одна реплика.
 
-Ветки и релизный цикл: `development` → CI/GHCR; `release/*` → проверка выпуска;
-production promotion запускается вручную с сохранением проверенного digest.
-Первичное восстановление dev-проекций из уже опубликованных сохранённых событий
-владельцев описывается в infrastructure. Это не импорт локальных баз.
+PR запускает build/test без публикации и деплоя. Push в `release/*` публикует
+кандидат с `release.json`; ручной production workflow из `master` принимает
+`candidate-<run-number>.<attempt>`, проверяет успешный исходный CI и идентичность
+дерева, продвигает те же digest без пересборки. Production ещё не подготовлен:
+нужны его values, Secrets, runner и GitHub environment protections.
+Откат миграций в эту схему не включён.
 
+Общие workflows закреплены тегом `delivery-v0.6.0` в `sellgar.infrastructure`.
+Порядок установки runner и передачи управления: [доставка приложений](https://github.com/pyatakovvg/sellgar.infrastructure/blob/development/docs/application-delivery.md).
 
 ## Цена учётной записи и переход со старой модели
 
