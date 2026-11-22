@@ -64,9 +64,12 @@
   Код сохраняется из product.created/updated и полного synchronizeProduct.
   Снимок без brandCode не стирает уже известный код. Старые NULL-проекции перед
   включением фильтра заполняются существующей store.catalog.synchronize.
-- Политику показа и наличия витрины задает client gateway, не Store. Catalog snapshot
-  status не подменяет собственный status Store; правила зависимых сущностей при
-  архивации каталога проектируются отдельно.
+- Политику показа и наличия витрины задает client gateway, не Store. Архив каталога
+  каскадно архивирует продажи: Product — StoreProduct и все его StoreOffer;
+  Variant — соответствующие StoreOffer во всех магазинах. Учётки, цены и остатки
+  сохраняются. CatalogArchiveRepository вызывается в транзакции применения
+  Product snapshot, включая recovery, и пишет Store outbox. Повтор не меняет версии.
+  Создание/изменение блокирует каталог до StoreProduct, как и применение снимка.
 - Полные store.product.getSnapshot/getSnapshots и getByRecordUuid предназначены
   для интеграционного recovery; они включают архив и не открываются в gateway.
   Outbox и результат архивной команды получают полный снимок в транзакции записи.

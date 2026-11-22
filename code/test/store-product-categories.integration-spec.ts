@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { catalogArchives } from './catalog-archives.fixture';
 
 import { CursorPagination } from '@sellgar/pagination';
 import { OutboxWriter } from '@sellgar/outbox';
@@ -109,7 +110,7 @@ describe('Store product category assignments in PostgreSQL', () => {
       new InventoryRepository(commands, events),
       new CommandFactory(),
     );
-    snapshots = new SnapshotEventService(source);
+    snapshots = new SnapshotEventService(source, catalogArchives(source));
     await source.query(`INSERT INTO currency(code,value) VALUES ('RUB','Российский рубль')`);
     await source.query(`INSERT INTO shop_snapshot(shop_uuid,source_version,name) VALUES ($1,1,'Магазин')`, [shopUuid]);
     await snapshots.apply(event(productUuid, 1));

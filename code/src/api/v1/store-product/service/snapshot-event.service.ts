@@ -13,12 +13,16 @@ import { VariantSnapshotModel } from '../model/variant-snapshot.model';
 
 import { IntegrationEventDto } from './dto/integration-event.dto';
 import { ProductSnapshotPayloadDto } from './dto/product-snapshot-payload.dto';
+import { CatalogArchiveRepository } from '../repository/catalog-archive.repository';
 
 type EventApplyStatus = 'processed' | 'ignored' | 'parked';
 
 @Injectable()
 export class SnapshotEventService {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly archives: CatalogArchiveRepository,
+  ) {}
 
   async apply(event: IntegrationEventDto) {
     return this.dataSource.transaction(async (manager) => {
@@ -132,6 +136,7 @@ export class SnapshotEventService {
       );
     }
 
+    await this.archives.apply(manager, payload);
     return 'processed';
   }
 
@@ -171,6 +176,7 @@ export class SnapshotEventService {
           })),
           ['variantUuid'],
         );
+      await this.archives.apply(manager, payload);
       await manager.update(
         SyncIssueModel,
         {

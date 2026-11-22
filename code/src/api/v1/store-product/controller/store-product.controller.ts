@@ -8,10 +8,30 @@ import { RecordInventoryDto } from './dto/record-inventory.dto';
 import { AdjustRecordInventoryDto } from './dto/adjust-record-inventory.dto';
 import { GetAllStoreProductsDto } from './dto/get-all-store-products.dto';
 import { GetProductByRecordDto } from './dto/get-product-by-record.dto';
+import { CatalogArchiveImpactDto } from './dto/catalog-archive-impact.dto';
+import { StoreProductQueryRepository } from '../repository/store-product-query.repository';
+import { SnapshotEventService } from '../service/snapshot-event.service';
+import { CatalogSnapshotDto } from './dto/catalog-snapshot.dto';
 
 @Controller()
 export class StoreProductController {
-  constructor(private readonly service: StoreProductService) {}
+  constructor(
+    private readonly service: StoreProductService,
+    private readonly queries: StoreProductQueryRepository,
+    private readonly snapshots: SnapshotEventService,
+  ) {}
+
+  @MessagePattern({ cmd: 'store.catalog.archiveImpact' })
+  archiveImpact(@Payload() dto: CatalogArchiveImpactDto) {
+    return this.queries.archiveImpact(dto.productUuid, dto.variantUuid);
+  }
+
+  @MessagePattern({ cmd: 'store.catalog.synchronizeSnapshot' })
+  async synchronizeSnapshot(@Payload() dto: CatalogSnapshotDto) {
+    await this.snapshots.synchronizeProduct(dto);
+    return { productUuid: dto.uuid, version: dto.version };
+  }
+
   @MessagePattern({ cmd: 'store.product.getAll' }) getAll(
     @Payload('query')
     query: GetAllStoreProductsDto,

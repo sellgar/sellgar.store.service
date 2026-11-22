@@ -8,6 +8,7 @@ import { StoreOfferRepository } from './repository/store-offer.repository';
 import { AccountingRecordRepository } from './repository/accounting-record.repository';
 import { CatalogSyncService } from './service/catalog-sync.service';
 import { Module } from '@nestjs/common';
+import { CatalogArchiveRepository } from './repository/catalog-archive.repository';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AccountingRecordModel } from './model/accounting-record.model';
@@ -46,6 +47,7 @@ import { VariantSnapshotModel } from './model/variant-snapshot.model';
   ],
   controllers: [StoreProductController, SnapshotEventController],
   providers: [
+    CatalogArchiveRepository,
     CatalogSyncService,
     CommandFactory,
     StoreEventRepository,

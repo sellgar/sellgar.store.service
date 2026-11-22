@@ -41,13 +41,16 @@ export class StoreProductRepository {
   }
   update(command: UpdateStoreProductCommand) {
     return this.commands.execute(command, 'store.product.update', StoreProductEntity, async (manager) => {
+      const reference = await manager.findOneBy(StoreProductModel, { uuid: command.uuid });
+      if (!reference) throw new ConflictException('Store product version conflict');
+      // Snapshot application locks catalog before Store Product; writes use the same order.
+      await this.validateSnapshots(manager, reference.shopUuid, reference.productUuid);
       const current = await manager.findOne(StoreProductModel, {
         where: { uuid: command.uuid },
         lock: { mode: 'pessimistic_write' },
       });
       if (!current || current.version !== command.expectedVersion)
         throw new ConflictException('Store product version conflict');
-      await this.validateSnapshots(manager, current.shopUuid, current.productUuid);
       await manager.update(
         StoreProductModel,
         { uuid: current.uuid, version: command.expectedVersion },

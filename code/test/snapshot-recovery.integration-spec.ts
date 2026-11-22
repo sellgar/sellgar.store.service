@@ -14,6 +14,7 @@ import { IntegrationEventDto } from '../src/api/v1/store-product/service/dto/int
 import { ProductSnapshotPayloadDto } from '../src/api/v1/store-product/service/dto/product-snapshot-payload.dto';
 import { SnapshotEventService } from '../src/api/v1/store-product/service/snapshot-event.service';
 import { StoreDatabaseOptions } from '../src/database/store-database.options';
+import { catalogArchives } from './catalog-archives.fixture';
 
 config({ path: '.env', quiet: true });
 
@@ -69,7 +70,7 @@ describe('Product snapshot recovery in PostgreSQL', () => {
       }),
     ).initialize();
     await source.runMigrations();
-    snapshots = new SnapshotEventService(source);
+    snapshots = new SnapshotEventService(source, catalogArchives(source));
     const sync = new CatalogSyncService({ send } as unknown as ClientProxy, snapshots);
     controller = new SnapshotEventController(snapshots, sync);
   });

@@ -15,6 +15,7 @@ import { StoreOfferStatus } from '../enum/store-offer-status.enum';
 import { StoreProductEntity, StorefrontOfferEntity, StorefrontOfferDetailEntity } from '../entity';
 import { GetAllStoreProductsCommand } from '../service/command/get-all-store-products.command';
 import { StoreProductCategoryRepository } from './store-product-category.repository';
+import { CatalogArchiveImpactEntity } from '../entity/catalog-archive-impact.entity';
 
 @Injectable()
 export class StoreProductQueryRepository {
@@ -23,6 +24,18 @@ export class StoreProductQueryRepository {
     private readonly categories: StoreProductCategoryRepository,
     private readonly pagination: CursorPagination,
   ) {}
+
+  async archiveImpact(productUuid: string, variantUuid?: string): Promise<CatalogArchiveImpactEntity> {
+    const [row]: { offer_count: string; shop_count: string }[] = await this.dataSource.query(
+      `SELECT count(so.uuid)::text AS offer_count, count(DISTINCT sp.shop_uuid)::text AS shop_count
+       FROM store_product sp LEFT JOIN store_offer so ON sp.uuid=so.store_product_uuid
+         AND so.status <> 'archived' AND ($2::uuid IS NULL OR so.variant_uuid=$2)
+       WHERE sp.product_uuid=$1 AND sp.status <> 'archived'
+       AND ($2::uuid IS NULL OR so.uuid IS NOT NULL)`,
+      [productUuid, variantUuid ?? null],
+    );
+    return { offerCount: Number(row.offer_count), shopCount: Number(row.shop_count) };
+  }
   async getAll(query: Partial<GetAllStoreProductsCommand>) {
     const page = await this.readPage(this.applyFilters(this.buildStoreProductQuery(), query), query, 'storeProduct');
     await this.loadPrices(page.items, this.dataSource.manager);

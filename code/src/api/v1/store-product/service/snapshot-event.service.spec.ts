@@ -9,6 +9,7 @@ import { ProductSnapshotModel } from '../model/product-snapshot.model';
 import { VariantSnapshotModel } from '../model/variant-snapshot.model';
 import { IntegrationEventDto } from './dto/integration-event.dto';
 import { SnapshotEventService } from './snapshot-event.service';
+import { CatalogArchiveRepository } from '../repository/catalog-archive.repository';
 
 describe(SnapshotEventService.name, () => {
   const productUuid = '11111111-1111-4111-8111-111111111111';
@@ -24,7 +25,11 @@ describe(SnapshotEventService.name, () => {
       operation(manager as unknown as EntityManager),
     ),
   };
-  const service = new SnapshotEventService(dataSource as unknown as DataSource);
+  const archives = { apply: jest.fn() };
+  const service = new SnapshotEventService(
+    dataSource as unknown as DataSource,
+    archives as unknown as CatalogArchiveRepository,
+  );
 
   const event = plainToInstance(IntegrationEventDto, {
     eventUuid: '33333333-3333-4333-8333-333333333333',
