@@ -39,6 +39,18 @@ export class StoreProductService {
     return this.queries.getByRecordUuid(recordUuid);
   }
 
+  getSnapshot(uuid: string) {
+    return this.queries.getSnapshot(uuid);
+  }
+
+  async getSnapshots(input: Partial<Pick<GetAllStoreProductsCommand, 'limit' | 'nextToken'>> = {}) {
+    const query = await this.commands.create(GetAllStoreProductsCommand, {
+      limit: input.limit,
+      nextToken: input.nextToken,
+    });
+    return this.queries.getSnapshots({ limit: query.limit, nextToken: query.nextToken });
+  }
+
   async getOffers(input: Partial<GetAllStoreProductsCommand> = {}) {
     const query = await this.commands.create(GetAllStoreProductsCommand, input);
     const result = plainToInstance(StorefrontOfferResultEntity, await this.queries.getOffers(query), {

@@ -43,7 +43,11 @@
 - Все read-команды `store.product.getAll`/`getByUuid` и `store.offer.getAll`/`getByUuid`
   принимают один плоский `query`: search, shopUuid, productUuid, productStatus,
   productShowing, variantStatus, variantShowing, quantityMin/Max, reservedMin/Max,
-  availableMin/Max. Без фильтров возвращают все записи, включая скрытые и архивные.
+  availableMin/Max. Обычные чтения исключают собственные archived StoreProduct/StoreOffer
+  в SQL до пагинации, включая вложенные offers и siblingOffers. Disabled и скрытые
+  записи не являются архивом. Архивный UUID даёт NotFound; query не снимает ограничение.
+- Read Entity допускает offers=[]: собственный статус корня не определяется
+  наличием действующих предложений. Ограничение команды создания не ослабляется.
 - Фильтры применяются SQL к одной цепочке product–offer–record и ограничивают
   состав вложенных offers/records. Границы включительные; false и 0 не пропускаются.
   Query карточки проверяется так же, как query списка; отсутствие совпадений дает 404.
@@ -60,8 +64,13 @@
   Код сохраняется из product.created/updated и полного synchronizeProduct.
   Снимок без brandCode не стирает уже известный код. Старые NULL-проекции перед
   включением фильтра заполняются существующей store.catalog.synchronize.
-- Политику витрины задает client gateway, не Store. Catalog snapshot status не
-  подменяет собственный status Store; актуальность каталога проверяет BFF у владельца.
+- Политику показа и наличия витрины задает client gateway, не Store. Catalog snapshot
+  status не подменяет собственный status Store; правила зависимых сущностей при
+  архивации каталога проектируются отдельно.
+- Полные store.product.getSnapshot/getSnapshots и getByRecordUuid предназначены
+  для интеграционного recovery; они включают архив и не открываются в gateway.
+  Outbox и результат архивной команды получают полный снимок в транзакции записи.
+  CatalogSyncService читает catalog.v2.product.getSnapshot, а не обычную карточку.
 - `search` использует PostgreSQL FTS по названиям product/variant snapshot и
   артикулу accounting_record. Только эти поля; уточнения и описания не индексируются.
   Один `accounting_record.search_vector` и один GIN `accounting_record_search_idx`.

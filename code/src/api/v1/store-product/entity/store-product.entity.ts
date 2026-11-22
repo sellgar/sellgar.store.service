@@ -1,17 +1,7 @@
 import { Transform } from 'class-transformer';
 import { ArrayUnique } from 'class-validator';
 import { Expose, Type } from 'class-transformer';
-import {
-  IsUUID,
-  IsDate,
-  ValidateNested,
-  IsNumber,
-  IsBoolean,
-  IsOptional,
-  IsEnum,
-  IsArray,
-  ArrayMinSize,
-} from 'class-validator';
+import { IsUUID, IsDate, ValidateNested, IsNumber, IsBoolean, IsOptional, IsEnum, IsArray } from 'class-validator';
 import { ShopSnapshotEntity } from './shop-snapshot.entity';
 import { ProductSnapshotEntity } from './product-snapshot.entity';
 import { StoreOfferEntity } from './store-offer.entity';
@@ -63,7 +53,6 @@ export class StoreProductEntity {
 
   @Expose()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested()
   @Type(() => StoreOfferEntity)
   offers: StoreOfferEntity[];

@@ -662,7 +662,7 @@ describe('Accounting records in PostgreSQL', () => {
     expect(detail.siblingOffers).toHaveLength(1);
   });
 
-  it('filters owned product and variant statuses independently without hard-coded storefront rules', async () => {
+  it('excludes archived offers even when explicitly requested and retains disabled products', async () => {
     const fixture = await createFilterFixture();
     await source.query("UPDATE store_product SET status='disabled' WHERE uuid=$1", [fixture.uuid]);
     await source.query("UPDATE store_offer SET status='archived' WHERE store_product_uuid=$1 AND showing=false", [
@@ -673,12 +673,69 @@ describe('Accounting records in PostgreSQL', () => {
       productStatus: StoreProductStatus.DISABLED,
       variantStatus: StoreOfferStatus.ARCHIVED,
     });
-    expect(result.items[0].status).toBe('disabled');
-    expect(result.items[0].offers.map((offer) => offer.status)).toEqual(['archived']);
+    expect(result.items).toEqual([]);
     expect(
       (await service.getAll({ productUuid: fixture.productUuid, productStatus: StoreProductStatus.ACTIVE })).items,
     ).toEqual([]);
-    expect((await service.getAll({ productUuid: fixture.productUuid })).items[0].offers).toHaveLength(2);
+    const ordinary = (await service.getAll({ productUuid: fixture.productUuid })).items[0];
+    expect(ordinary.status).toBe('disabled');
+    expect(ordinary.offers).toHaveLength(1);
+    expect((await service.getByUuid(fixture.uuid)).offers).toHaveLength(1);
+    const archived = fixture.offers.find((offer) => !offer.showing)!;
+    await expect(service.getOffer(archived.uuid)).rejects.toMatchObject({ status: 404 });
+    const detail = await service.getOffer(ordinary.offers[0].uuid);
+    expect(detail.siblingOffers.map((offer) => offer.uuid)).toEqual([ordinary.offers[0].uuid]);
+    expect((await service.getOffers({ productUuid: fixture.productUuid, limit: 1 })).meta.nextToken).toBeNull();
+    expect((await service.getAll({ search: `FILTER-LOW-${fixture.suffix}` })).items).toEqual([]);
+    expect((await service.getSnapshot(fixture.uuid)).offers).toHaveLength(2);
+    await source.query("UPDATE store_offer SET status='archived' WHERE store_product_uuid=$1", [fixture.uuid]);
+    const empty = (await service.getAll({ productUuid: fixture.productUuid })).items[0];
+    expect(empty.status).toBe(StoreProductStatus.DISABLED);
+    expect(empty.offers).toEqual([]);
+    expect((await service.getByUuid(fixture.uuid)).offers).toEqual([]);
+    expect((await service.getOffers({ productUuid: fixture.productUuid })).items).toEqual([]);
+  });
+
+  it('hides an archived Store root while keeping full snapshots and archive events', async () => {
+    const fixture = await createFilterFixture();
+    const archived = await service.archive({
+      commandId: randomUUID(),
+      uuid: fixture.uuid,
+      expectedVersion: fixture.version,
+    });
+    expect(archived.status).toBe(StoreProductStatus.ARCHIVED);
+    expect(archived.offers).toHaveLength(2);
+    const query = { productUuid: fixture.productUuid };
+    expect((await service.getAll(query)).items).toEqual([]);
+    expect((await service.getOffers(query)).items).toEqual([]);
+    expect((await service.getAll({ ...query, productStatus: StoreProductStatus.ARCHIVED })).items).toEqual([]);
+    await expect(service.getByUuid(fixture.uuid)).rejects.toMatchObject({ status: 404 });
+    for (const offer of fixture.offers)
+      await expect(service.getOffer(offer.uuid)).rejects.toMatchObject({ status: 404 });
+    expect((await service.getSnapshot(fixture.uuid)).offers).toHaveLength(2);
+    expect((await service.getByRecordUuid(fixture.offers[0].records[0].uuid)).uuid).toBe(fixture.uuid);
+    const eventRows = await source.query(
+      "SELECT payload FROM outbox_event WHERE aggregate_uuid=$1 AND event_type='store.product.archived'",
+      [fixture.uuid],
+    );
+    expect(eventRows[0].payload.offers).toHaveLength(2);
+    const ordinary: string[] = [];
+    const snapshots: string[] = [];
+    for (const [read, ids] of [
+      [(nextToken?: string) => service.getAll({ limit: 2, nextToken }), ordinary],
+      [(nextToken?: string) => service.getSnapshots({ limit: 2, nextToken }), snapshots],
+    ] as const) {
+      let nextToken: string | undefined;
+      do {
+        const page = await read(nextToken);
+        expect(page.items.length).toBeGreaterThan(0);
+        ids.push(...page.items.map((item) => item.uuid));
+        nextToken = page.meta.nextToken ?? undefined;
+      } while (nextToken);
+    }
+    expect(ordinary).not.toContain(fixture.uuid);
+    expect(snapshots).toContain(fixture.uuid);
+    expect(new Set(ordinary).size).toBe(ordinary.length);
   });
 
   it('searches names and articles using FTS and updates the document after renames', async () => {

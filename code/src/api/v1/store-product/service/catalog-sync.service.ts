@@ -13,7 +13,7 @@ export class CatalogSyncService {
   ) {}
   async synchronize(productUuid: string) {
     const result = await firstValueFrom(
-      this.productClient.send({ cmd: 'catalog.v2.product.getByUuid' }, { uuid: productUuid }).pipe(timeout(10000)),
+      this.productClient.send({ cmd: 'catalog.v2.product.getSnapshot' }, { uuid: productUuid }).pipe(timeout(10000)),
     );
     const payload = plainToInstance(ProductSnapshotPayloadDto, result);
     if (payload.uuid !== productUuid) throw new Error('Catalog response identifies another product');

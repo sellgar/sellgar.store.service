@@ -10,6 +10,8 @@ import { StoreOfferModel } from '../model/store-offer.model';
 import { ShopSnapshotModel } from '../model/shop-snapshot.model';
 import { ProductSnapshotModel } from '../model/product-snapshot.model';
 import { PriceHistoryModel } from '../model/price-history.model';
+import { StoreProductStatus } from '../enum/store-product-status.enum';
+import { StoreOfferStatus } from '../enum/store-offer-status.enum';
 import { StoreProductEntity, StorefrontOfferEntity, StorefrontOfferDetailEntity } from '../entity';
 import { GetAllStoreProductsCommand } from '../service/command/get-all-store-products.command';
 import { StoreProductCategoryRepository } from './store-product-category.repository';
@@ -51,7 +53,27 @@ export class StoreProductQueryRepository {
     if (!row) throw new NotFoundException('Accounting record not found');
 
     // Internal synchronization read includes hidden and archived records.
-    return this.getByUuid(row.uuid);
+    return this.getSnapshot(row.uuid);
+  }
+
+  async getSnapshot(uuid: string, manager: EntityManager = this.dataSource.manager): Promise<StoreProductEntity> {
+    const row = await this.buildStoreProductQuery(manager, true)
+      .andWhere('storeProduct.uuid = :uuid', { uuid })
+      .getOne();
+    if (!row) throw new NotFoundException('Store product not found');
+    await this.loadPrices([row], manager);
+    return this.toEntity(row);
+  }
+
+  async getSnapshots(query: Pick<GetAllStoreProductsCommand, 'limit' | 'nextToken'>) {
+    const page = await this.readPage(
+      this.buildStoreProductQuery(this.dataSource.manager, true),
+      query,
+      'storeProduct',
+      'store.product.snapshots',
+    );
+    await this.loadPrices(page.items, this.dataSource.manager);
+    return { items: page.items.map((row) => this.toEntity(row)), meta: page.meta };
   }
 
   async getOffers(query: Partial<GetAllStoreProductsCommand> = {}) {
@@ -83,6 +105,7 @@ export class StoreProductQueryRepository {
     builder: SelectQueryBuilder<T>,
     query: Partial<GetAllStoreProductsCommand>,
     alias: 'storeProduct' | 'offer',
+    scope = 'store.' + alias + '.list',
   ) {
     const { limit, nextToken, offset, ...filters } = query;
     const codes = (value: string | string[] | undefined) =>
@@ -95,7 +118,7 @@ export class StoreProductQueryRepository {
       builder,
       { limit, nextToken, offset },
       {
-        scope: 'store.' + alias + '.list',
+        scope,
         filters: { ...filters, categoryUuid: codes(filters.categoryUuid), brandCode: codes(filters.brandCode) },
         order,
       },
@@ -191,8 +214,8 @@ export class StoreProductQueryRepository {
       { excludeExtraneousValues: true },
     );
   }
-  buildStoreProductQuery(manager: EntityManager = this.dataSource.manager) {
-    return manager
+  private buildStoreProductQuery(manager: EntityManager = this.dataSource.manager, snapshot = false) {
+    const builder = manager
       .createQueryBuilder(StoreProductModel, 'storeProduct')
       .leftJoinAndMapOne(
         'storeProduct.shopSnapshot',
@@ -207,7 +230,14 @@ export class StoreProductQueryRepository {
         'productSnapshot.productUuid = storeProduct.productUuid',
       )
       .leftJoinAndSelect('storeProduct.categoryLinks', 'categoryLinks')
-      .leftJoinAndSelect('storeProduct.offers', 'offer')
+      .leftJoinAndSelect(
+        'storeProduct.offers',
+        'offer',
+        snapshot ? undefined : 'offer.status != :archivedOfferStatus',
+        {
+          archivedOfferStatus: StoreOfferStatus.ARCHIVED,
+        },
+      )
       .leftJoinAndSelect('offer.variantSnapshot', 'variantSnapshot')
       .leftJoinAndSelect('offer.records', 'records')
       .leftJoinAndMapOne(
@@ -223,12 +253,19 @@ export class StoreProductQueryRepository {
       .addOrderBy('records.order', 'ASC')
       .addOrderBy('clarifications.position', 'ASC')
       .addOrderBy('offer.createdAt', 'ASC');
+    if (!snapshot)
+      builder.andWhere('storeProduct.status != :archivedProductStatus', {
+        archivedProductStatus: StoreProductStatus.ARCHIVED,
+      });
+    return builder;
   }
 
-  buildStoreOfferQuery(manager: EntityManager = this.dataSource.manager) {
+  private buildStoreOfferQuery(manager: EntityManager = this.dataSource.manager) {
     return manager
       .createQueryBuilder(StoreOfferModel, 'offer')
       .innerJoinAndSelect('offer.storeProduct', 'storeProduct')
+      .andWhere('storeProduct.status != :archivedProductStatus', { archivedProductStatus: StoreProductStatus.ARCHIVED })
+      .andWhere('offer.status != :archivedOfferStatus', { archivedOfferStatus: StoreOfferStatus.ARCHIVED })
       .leftJoinAndMapOne(
         'offer.productSnapshot',
         ProductSnapshotModel,

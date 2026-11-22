@@ -30,6 +30,16 @@ export class StoreProductController {
     return this.service.getByRecordUuid(dto.recordUuid);
   }
 
+  @MessagePattern({ cmd: 'store.product.getSnapshot' })
+  getSnapshot(@Payload('uuid') uuid: string) {
+    return this.service.getSnapshot(uuid);
+  }
+
+  @MessagePattern({ cmd: 'store.product.getSnapshots' })
+  getSnapshots(@Payload('query') query: GetAllStoreProductsDto) {
+    return this.service.getSnapshots(query);
+  }
+
   @MessagePattern({ cmd: 'store.offer.getAll' }) getOffers(@Payload('query') query: GetAllStoreProductsDto) {
     return this.service.getOffers(query);
   }

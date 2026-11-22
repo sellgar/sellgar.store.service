@@ -45,16 +45,26 @@ RMQ patterns:
 
 - store.product.getAll: `{ query: { search?, shopUuid?, productUuid?, categoryUuid?, ... } }`;
 - store.product.getByUuid: `{ uuid, query? }`;
+- store.product.getSnapshot: `{ uuid }` — полный внутренний снимок для recovery;
+- store.product.getSnapshots: `{ query: { limit?, nextToken? } }` — полные внутренние
+  снимки, включая архивные; отдельная область курсора для bootstrap Cart;
 - store.product.getByRecordUuid: `{ recordUuid }` — полный Store Product по учетной записи,
   включая скрытые/архивные связи и нулевые остатки; внутреннее восстановление проекций Cart.
 - store.product.create: `{ commandId, shopUuid, productUuid, showing, offers }`;
 - store.product.update: `{ commandId, uuid, expectedVersion, showing?, offers? }`;
 - store.product.archive: `{ commandId, uuid, expectedVersion }`;
-- store.offer.getAll: `{ query? }` — фильтрованный список предложений; без фильтров включая скрытые и архивные;
+- store.offer.getAll: `{ query? }` — фильтрованный список предложений, исключающий собственный архив Store;
 - store.offer.getByUuid: `{ uuid, query? }` — связь с учетными записями, соседние варианты и категории товара;
 - store.inventory.receipt / writeOff / adjust:
   `{ commandId, recordUuid, expectedVersion, quantity, reason?, sourceUuid?, createdBy? }`;
 - store.catalog.synchronize: `{ productUuid }` — один запрос актуального снимка у каталога.
+
+Обычные списки и карточки исключают архивные StoreProduct/StoreOffer в SQL до
+пагинации, в том числе из вложенных offers и siblingOffers. Явный архивный статус
+в query не открывает архив. Архивный UUID возвращает NotFound. Disabled и скрытые
+записи остаются доступны без соответствующих дополнительных фильтров.
+Снимки, архивные события и внутреннее чтение по recordUuid сохраняют полный состав.
+CatalogSync использует отдельную команду `catalog.v2.product.getSnapshot`.
 
 `categoryUuid` — необязательный UUID или массив UUID в общем плоском query списков и
 карточек. Он ограничивает выдачу товарами, назначенными хотя бы одной выбранной
@@ -148,8 +158,9 @@ store.product.created, store.product.updated и store.product.archived.
 Payload Store Product имеет schemaVersion=3, Inventory — schemaVersion=2.
 Для остатков pattern store.inventory.updated с aggregateType=record_inventory:
 payload содержит recordUuid и текущие quantity/reserved/available/version.
-Storefront list и detail исключают архивированные товары и варианты каталога,
-а также скрытые или архивные связи Store. Учетные данные при этом сохраняются.
+Обычные list и detail исключают собственный архив Store. Политика storefront
+добавляет ограничения показа и наличия. Реакция самостоятельных записей Store
+на архивирование каталога относится к отдельной задаче; учетные данные сохраняются.
 
 ## Схема базы и запуск
 
