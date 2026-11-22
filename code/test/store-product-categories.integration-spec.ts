@@ -72,7 +72,7 @@ describe('Store product category assignments in PostgreSQL', () => {
       aggregateId: uuid,
       aggregateVersion: version,
       occurredAt: new Date().toISOString(),
-      payload: { uuid, version, name: 'Майка', status, variants },
+      payload: { uuid, version, name: 'Майка', brandCode: 'apple', status, variants },
     });
   beforeAll(async () => {
     const control = await new DataSource({
@@ -283,6 +283,72 @@ describe('Store product category assignments in PostgreSQL', () => {
     }
     expect((await service.getOffers({ shopUuid })).data.map((item) => item.uuid)).toEqual([product.offers[0].uuid]);
     expect((await service.getAll({ shopUuid })).data.map((item) => item.uuid)).toEqual([product.uuid]);
+  });
+
+  it('filters by one or several brands in SQL together with category, search and inventory', async () => {
+    const otherProductUuid = randomUUID();
+    const otherVariantUuid = randomUUID();
+    const otherEvent = event(otherProductUuid, 1, 'active', [
+      { uuid: otherVariantUuid, name: 'Белая', status: 'active' },
+    ]);
+    otherEvent.payload.brandCode = 'samsung';
+    await snapshots.apply(otherEvent);
+    const other = await service.create({
+      ...input(),
+      productUuid: otherProductUuid,
+      categoryUuids: [leafUuid],
+      offers: [
+        {
+          variantUuid: otherVariantUuid,
+          showing: true,
+          records: [{ currentPrice: { value: '150', currencyCode: 'RUB' } }],
+        },
+      ],
+    });
+    const query = { shopUuid, categoryUuid: rootUuid };
+    for (const [brandCode, expected] of [
+      ['apple', [product.offers[0].uuid]],
+      ['samsung', [other.offers[0].uuid]],
+      [
+        ['apple', 'samsung', 'apple'],
+        [product.offers[0].uuid, other.offers[0].uuid],
+      ],
+      ['missing', []],
+      [[], []],
+    ] as [string | string[], string[]][]) {
+      const result = await service.getOffers({ ...query, brandCode });
+      expect(result.data.map((item) => item.uuid).sort()).toEqual(expected.sort());
+      expect(result.meta.totalRows).toBe(expected.length);
+      expect((await service.getAll({ ...query, brandCode })).meta.totalRows).toBe(expected.length);
+    }
+    expect(
+      (await service.getOffers({ ...query, brandCode: 'apple', search: 'Син', availableMax: 0 })).meta.totalRows,
+    ).toBe(1);
+    expect((await service.getOffers({ ...query, brandCode: 'apple', availableMin: 1 })).data).toEqual([]);
+    await expect(service.getOffer(product.offers[0].uuid, { brandCode: 'samsung' })).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it('fills existing projections by same-version synchronization and keeps newer brand changes', async () => {
+    await source.query('UPDATE product_snapshot SET brand_code = NULL WHERE product_uuid = $1', [productUuid]);
+    expect((await service.getOffers({ shopUuid, brandCode: 'apple' })).data).toEqual([]);
+    const payload = plainToInstance(ProductSnapshotPayloadDto, event(productUuid, 1).payload);
+    await snapshots.synchronizeProduct(payload);
+    expect((await service.getOffers({ shopUuid, brandCode: 'apple' })).meta.totalRows).toBe(1);
+    await snapshots.synchronizeProduct(
+      plainToInstance(ProductSnapshotPayloadDto, { ...payload, brandCode: undefined }),
+    );
+    expect((await service.getOffers({ shopUuid, brandCode: 'apple' })).meta.totalRows).toBe(1);
+
+    const changed = event(productUuid, 2);
+    changed.payload.brandCode = 'samsung';
+    await snapshots.apply(changed);
+    await snapshots.apply(event(productUuid, 1));
+    await snapshots.synchronizeProduct(payload);
+    expect((await service.getOffers({ shopUuid, brandCode: 'apple' })).data).toEqual([]);
+    expect((await service.getByUuid(product.uuid)).productUuid).toBe(productUuid);
+    expect((await service.getOffers({ shopUuid, brandCode: 'samsung' })).meta.totalRows).toBe(2);
   });
 
   it('replaces, preserves omitted assignments, clears explicitly and replays idempotently', async () => {

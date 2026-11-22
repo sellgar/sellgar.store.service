@@ -38,6 +38,7 @@ describe(SnapshotEventService.name, () => {
     payload: {
       uuid: productUuid,
       name: 'Майка',
+      brandCode: 'test-brand',
       status: 'active',
       version: 2,
       variants: [{ uuid: variantUuid, name: 'Синяя', status: 'active' }],
@@ -60,7 +61,15 @@ describe(SnapshotEventService.name, () => {
 
     expect(manager.upsert).toHaveBeenCalledWith(
       ProductSnapshotModel,
-      [expect.objectContaining({ productUuid, sourceVersion: 2, name: 'Майка', status: 'active' })],
+      [
+        expect.objectContaining({
+          productUuid,
+          sourceVersion: 2,
+          name: 'Майка',
+          brandCode: 'test-brand',
+          status: 'active',
+        }),
+      ],
       ['productUuid'],
     );
     expect(manager.upsert).toHaveBeenCalledWith(

@@ -25,6 +25,10 @@ describe('Store flat query validation', () => {
     await expect(factory.create(GetAllStoreProductsCommand, {})).resolves.toBeInstanceOf(GetAllStoreProductsCommand);
   });
   it.each([
+    { brandCode: '' },
+    { brandCode: null },
+    { brandCode: ['apple', 1] },
+    { brandCode: 'a'.repeat(257) },
     { categoryUuid: '' },
     { categoryUuid: 'not-a-uuid' },
     { categoryUuid: null },
@@ -50,6 +54,11 @@ describe('Store flat query validation', () => {
       await expect(factory.create(GetAllStoreProductsCommand, { categoryUuid: value })).resolves.toMatchObject({
         categoryUuid: value,
       });
+    }
+  });
+  it('accepts one or several exact brand codes', async () => {
+    for (const brandCode of ['apple', ['apple', 'samsung'], []]) {
+      await expect(factory.create(GetAllStoreProductsCommand, { brandCode })).resolves.toMatchObject({ brandCode });
     }
   });
 });

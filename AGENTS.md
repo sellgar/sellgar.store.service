@@ -16,7 +16,8 @@
 - Не хранить catalog product data как источник истины; хранить external UUID и
   минимальные snapshots для локальной проверки и read-model.
 - `product_snapshot` и `variant_snapshot` должны оставаться минимальными: UUID,
-  `source_version`, имя, статус и технические timestamps. `shop_snapshot` хранит UUID,
+  `source_version`, имя, статус и технические timestamps; `product_snapshot` также
+  хранит nullable `brandCode` для SQL-фильтрации. `shop_snapshot` хранит UUID,
   `source_version`, имя и технические timestamps; lifecycle у Shop отсутствует.
 - Полную модель товара/варианта/магазина собирает gateway/BFF через сервисы
   владельцы, а не `store_srv`.
@@ -53,6 +54,12 @@
   Пустая, неизвестная или не принадлежащая выбранному магазину категория даёт пустой
   список; пустой массив также даёт пустой список. Без параметра категория не
   ограничивает выдачу; null и не-UUID, в том числе внутри массива, отклоняются.
+- `brandCode` принимает строку или массив кодов; между кодами ИЛИ, с остальными
+  фильтрами И. Сравнение точное, по product_snapshot.brand_code; набор брендов,
+  свойства и изображения в Store не копируются. Пустой массив даёт пустую выдачу.
+  Код сохраняется из product.created/updated и полного synchronizeProduct.
+  Снимок без brandCode не стирает уже известный код. Старые NULL-проекции перед
+  включением фильтра заполняются существующей store.catalog.synchronize.
 - Политику витрины задает client gateway, не Store. Catalog snapshot status не
   подменяет собственный status Store; актуальность каталога проверяет BFF у владельца.
 - `search` использует PostgreSQL FTS по названиям product/variant snapshot и

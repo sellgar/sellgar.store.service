@@ -44,11 +44,7 @@ export class SnapshotEventService {
 
       if (event.aggregateType === 'shop') {
         status = await this.applyShopEvent(manager, event);
-      } else if (
-        event.aggregateType === 'product' &&
-        event.producer === 'product_srv' &&
-        event.schemaVersion === 3
-      ) {
+      } else if (event.aggregateType === 'product' && event.producer === 'product_srv' && event.schemaVersion === 3) {
         status = await this.applyProductEvent(manager, event);
       }
 
@@ -110,6 +106,7 @@ export class SnapshotEventService {
           sourceProducer: 'product_srv',
           sourceVersion: event.aggregateVersion,
           name: payload.name,
+          brandCode: payload.brandCode ?? current?.brandCode ?? null,
           status: payload.status,
           syncedAt: new Date(),
         },
@@ -153,6 +150,7 @@ export class SnapshotEventService {
           sourceProducer: 'product_srv',
           sourceVersion: payload.version,
           name: payload.name,
+          brandCode: payload.brandCode ?? current?.brandCode ?? null,
           status: payload.status,
           syncedAt: new Date(),
         },

@@ -95,6 +95,11 @@ export class StoreProductQueryRepository {
     for (const [field, column] of fields) {
       if (query[field] !== undefined) builder.andWhere(`${column} = :${field}`, { [field]: query[field] });
     }
+    if (query.brandCode !== undefined) {
+      builder.andWhere('productSnapshot.brandCode = ANY(CAST(:brandCodes AS varchar[]))', {
+        brandCodes: Array.isArray(query.brandCode) ? query.brandCode : [query.brandCode],
+      });
+    }
     if (query.categoryUuid !== undefined) {
       builder.addCommonTableExpression(
         `SELECT uuid, shop_uuid FROM category WHERE uuid = ANY(CAST(:categoryUuids AS uuid[]))
