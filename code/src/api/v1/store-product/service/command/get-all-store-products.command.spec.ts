@@ -25,6 +25,12 @@ describe('Store flat query validation', () => {
     await expect(factory.create(GetAllStoreProductsCommand, {})).resolves.toBeInstanceOf(GetAllStoreProductsCommand);
   });
   it.each([
+    { categoryUuid: '' },
+    { categoryUuid: 'not-a-uuid' },
+    { categoryUuid: null },
+    { categoryUuid: ['be250838-85f9-41fa-b9f3-99aba3590640', 'invalid'] },
+    { categoryUuid: [null] },
+    { categoryUuid: { uuid: 'be250838-85f9-41fa-b9f3-99aba3590640' } },
     { quantityMin: -1 },
     { reservedMax: 1.5 },
     { availableMin: '1' },
@@ -37,5 +43,13 @@ describe('Store flat query validation', () => {
     { variantStatus: 'deleted' },
   ])('rejects malformed or contradictory filters: %j', async (query) => {
     await expect(factory.create(GetAllStoreProductsCommand, query)).rejects.toThrow();
+  });
+  it('preserves the selected category in the query', async () => {
+    const categoryUuid = 'be250838-85f9-41fa-b9f3-99aba3590640';
+    for (const value of [categoryUuid, [categoryUuid], [categoryUuid, categoryUuid], []]) {
+      await expect(factory.create(GetAllStoreProductsCommand, { categoryUuid: value })).resolves.toMatchObject({
+        categoryUuid: value,
+      });
+    }
   });
 });

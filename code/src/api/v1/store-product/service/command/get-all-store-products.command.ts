@@ -36,6 +36,11 @@ export class GetAllStoreProductsCommand {
 
   @Expose()
   @ValidateIf((_object, value) => value !== undefined)
+  @IsUUID(undefined, { each: true })
+  categoryUuid?: string | string[];
+
+  @Expose()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsEnum(StoreProductStatus)
   productStatus?: StoreProductStatus;
 

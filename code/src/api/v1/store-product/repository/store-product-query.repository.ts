@@ -95,6 +95,24 @@ export class StoreProductQueryRepository {
     for (const [field, column] of fields) {
       if (query[field] !== undefined) builder.andWhere(`${column} = :${field}`, { [field]: query[field] });
     }
+    if (query.categoryUuid !== undefined) {
+      builder.addCommonTableExpression(
+        `SELECT uuid, shop_uuid FROM category WHERE uuid = ANY(CAST(:categoryUuids AS uuid[]))
+         UNION
+         SELECT child.uuid, child.shop_uuid FROM category child
+         JOIN category_branch parent ON child.parent_uuid = parent.uuid AND child.shop_uuid = parent.shop_uuid`,
+        'category_branch',
+        { recursive: true },
+      );
+      builder.andWhere(
+        `EXISTS (
+          SELECT 1 FROM store_product_category link
+          JOIN category_branch branch ON branch.uuid = link.category_uuid AND branch.shop_uuid = link.shop_uuid
+          WHERE link.store_product_uuid = "storeProduct"."uuid" AND link.shop_uuid = "storeProduct"."shop_uuid"
+        )`,
+        { categoryUuids: Array.isArray(query.categoryUuid) ? query.categoryUuid : [query.categoryUuid] },
+      );
+    }
     this.applyInventoryFilters(builder, query, 'inventory');
     if (query.search) {
       const records = builder

@@ -46,6 +46,7 @@ describe('Store product category assignments in PostgreSQL', () => {
     foreignUuid = randomUUID(),
     otherShopUuid = randomUUID();
   let product: StoreProductEntity;
+  let rootUuid: string;
   const input = () => ({
     commandId: randomUUID(),
     shopUuid,
@@ -169,6 +170,7 @@ describe('Store product category assignments in PostgreSQL', () => {
       parentUuid: null,
       description: null,
     });
+    rootUuid = root.uuid;
     await categories.update({
       commandId: randomUUID(),
       uuid: parentUuid,
@@ -184,6 +186,103 @@ describe('Store product category assignments in PostgreSQL', () => {
       { uuid: leafUuid, name: 'Кружки' },
     ]);
     expect((await service.getByUuid(product.uuid)).categoryUuids).toEqual([leafUuid, secondLeafUuid].sort());
+  });
+
+  it('selects products and offers by a leaf, its parent and its root without truncating assignments', async () => {
+    for (const categoryUuid of [leafUuid, parentUuid, rootUuid]) {
+      const products = await service.getAll({ shopUuid, categoryUuid });
+      const offers = await service.getOffers({ shopUuid, categoryUuid });
+      expect(products.data.map((item) => item.uuid)).toEqual([product.uuid]);
+      expect(products.meta.totalRows).toBe(1);
+      expect(products.data[0].categoryUuids).toEqual([leafUuid, secondLeafUuid].sort());
+      expect(offers.data.map((item) => item.uuid)).toEqual([product.offers[0].uuid]);
+      expect(offers.meta.totalRows).toBe(1);
+      expect((await service.getOffer(product.offers[0].uuid, { categoryUuid })).offer.uuid).toBe(
+        product.offers[0].uuid,
+      );
+    }
+  });
+
+  it('does not duplicate products or offers when several assigned leaves match the same branch', async () => {
+    await categories.update({
+      commandId: randomUUID(),
+      uuid: secondLeafUuid,
+      expectedVersion: 1,
+      name: 'Текстиль',
+      parentUuid,
+      description: null,
+    });
+    for (const categoryUuid of [parentUuid, rootUuid]) {
+      const products = await service.getAll({ categoryUuid });
+      const offers = await service.getOffers({ categoryUuid });
+      expect(products.data.map((item) => item.uuid)).toEqual([product.uuid]);
+      expect(products.meta.totalRows).toBe(1);
+      expect(offers.data.map((item) => item.uuid)).toEqual([product.offers[0].uuid]);
+      expect(offers.meta.totalRows).toBe(1);
+    }
+    const categoryUuid = [rootUuid, parentUuid, leafUuid, secondLeafUuid, leafUuid];
+    const products = await service.getAll({ categoryUuid });
+    const offers = await service.getOffers({ categoryUuid });
+    expect(products.data.map((item) => item.uuid)).toEqual([product.uuid]);
+    expect(products.meta.totalRows).toBe(1);
+    expect(offers.data.map((item) => item.uuid)).toEqual([product.offers[0].uuid]);
+    expect(offers.meta.totalRows).toBe(1);
+  });
+
+  it('combines category selection with search, visibility, status and inventory conditions', async () => {
+    const query = { shopUuid, categoryUuid: rootUuid };
+    const matching = await service.getOffers({ ...query, search: 'Майк', productShowing: true, availableMax: 0 });
+    expect(matching.data.map((item) => item.uuid)).toEqual([product.offers[0].uuid]);
+    for (const filters of [
+      { search: 'несуществующий' },
+      { productShowing: false },
+      { variantShowing: false },
+      { productStatus: StoreProductStatus.ARCHIVED },
+      { variantStatus: StoreOfferStatus.ARCHIVED },
+      { availableMin: 1 },
+    ]) {
+      expect(await service.getOffers({ ...query, ...filters })).toMatchObject({ data: [], meta: { totalRows: 0 } });
+      expect(await service.getAll({ ...query, ...filters })).toMatchObject({ data: [], meta: { totalRows: 0 } });
+    }
+  });
+
+  it('returns no matches for unknown or empty categories and keeps shop boundaries', async () => {
+    const empty = await categories.create({
+      commandId: randomUUID(),
+      shopUuid,
+      parentUuid: null,
+      name: 'Пустая',
+      description: null,
+    });
+    const foreignProduct = await service.create({ ...input(), shopUuid: otherShopUuid, categoryUuids: [foreignUuid] });
+    expect((await service.getOffers({ categoryUuid: foreignUuid })).data.map((item) => item.uuid)).toEqual([
+      foreignProduct.offers[0].uuid,
+    ]);
+
+    const categoryUuid = [rootUuid, foreignUuid];
+    const products = await service.getAll({ categoryUuid });
+    const offers = await service.getOffers({ categoryUuid });
+    expect(products.data.map((item) => item.uuid).sort()).toEqual([product.uuid, foreignProduct.uuid].sort());
+    expect(products.meta.totalRows).toBe(2);
+    expect(offers.data.map((item) => item.uuid).sort()).toEqual(
+      [product.offers[0].uuid, foreignProduct.offers[0].uuid].sort(),
+    );
+    expect(offers.meta.totalRows).toBe(2);
+    expect((await service.getOffers({ shopUuid, categoryUuid })).data.map((item) => item.uuid)).toEqual([
+      product.offers[0].uuid,
+    ]);
+    expect((await service.getAll({ shopUuid, categoryUuid })).data.map((item) => item.uuid)).toEqual([product.uuid]);
+
+    for (const categoryUuid of [randomUUID(), empty.uuid, foreignUuid, [], [empty.uuid, randomUUID()]]) {
+      expect(await service.getOffers({ shopUuid, categoryUuid })).toMatchObject({ data: [], meta: { totalRows: 0 } });
+      expect(await service.getAll({ shopUuid, categoryUuid })).toMatchObject({ data: [], meta: { totalRows: 0 } });
+      await expect(service.getOffer(product.offers[0].uuid, { shopUuid, categoryUuid })).rejects.toMatchObject({
+        status: 404,
+      });
+      await expect(service.getByUuid(product.uuid, { shopUuid, categoryUuid })).rejects.toMatchObject({ status: 404 });
+    }
+    expect((await service.getOffers({ shopUuid })).data.map((item) => item.uuid)).toEqual([product.offers[0].uuid]);
+    expect((await service.getAll({ shopUuid })).data.map((item) => item.uuid)).toEqual([product.uuid]);
   });
 
   it('replaces, preserves omitted assignments, clears explicitly and replays idempotently', async () => {

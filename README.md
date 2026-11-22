@@ -43,18 +43,31 @@ CHECK запрещает отрицательные остатки и reserved >
 
 RMQ patterns:
 
-- store.product.getAll: `{ query: { search?, shopUuid?, productUuid? } }`;
-- store.product.getByUuid: `{ uuid }`;
+- store.product.getAll: `{ query: { search?, shopUuid?, productUuid?, categoryUuid?, ... } }`;
+- store.product.getByUuid: `{ uuid, query? }`;
 - store.product.getByRecordUuid: `{ recordUuid }` — полный Store Product по учетной записи,
   включая скрытые/архивные связи и нулевые остатки; внутреннее восстановление проекций Cart.
 - store.product.create: `{ commandId, shopUuid, productUuid, showing, offers }`;
 - store.product.update: `{ commandId, uuid, expectedVersion, showing?, offers? }`;
 - store.product.archive: `{ commandId, uuid, expectedVersion }`;
-- store.offer.getAll: `{}` — только доступные для витрины связи;
-- store.offer.getByUuid: `{ uuid }` — связь с учетными записями, соседние варианты и категории товара;
+- store.offer.getAll: `{ query? }` — фильтрованный список предложений; без фильтров включая скрытые и архивные;
+- store.offer.getByUuid: `{ uuid, query? }` — связь с учетными записями, соседние варианты и категории товара;
 - store.inventory.receipt / writeOff / adjust:
   `{ commandId, recordUuid, expectedVersion, quantity, reason?, sourceUuid?, createdBy? }`;
 - store.catalog.synchronize: `{ productUuid }` — один запрос актуального снимка у каталога.
+
+`categoryUuid` — необязательный UUID или массив UUID в общем плоском query списков и
+карточек. Он ограничивает выдачу товарами, назначенными хотя бы одной выбранной
+категории или любому её потомку в том же магазине. Между ветками действует ИЛИ,
+между категорией и остальными фильтрами — И. SQL проверяет существование привязки,
+поэтому несколько совпадающих категорий не размножают предложения и `meta.totalRows`. У продукта
+сохраняется полный набор `categoryUuids`, а не только совпавшие привязки.
+Фильтр сочетается с `shopUuid`, поиском, статусами, показом и остатками.
+Неизвестная категория, категория без товаров или категория другого магазина при
+заданном `shopUuid` возвращает пустой список; карточка без совпадения — 404.
+Без `categoryUuid` поведение прежнее; пустой массив выбирает ноль товаров.
+Пустая строка, null и не-UUID, в том числе внутри массива, дают 400.
+Пагинация текущим query не поддерживается.
 
 Пример offers при создании:
 
