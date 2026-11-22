@@ -1,8 +1,3 @@
-import { Expose } from 'class-transformer';
-import { IsNumber } from 'class-validator';
+import { CursorMetaEntity } from '@sellgar/pagination';
 
-export class MetaEntity {
-  @Expose()
-  @IsNumber()
-  totalRows: number;
-}
+export class MetaEntity extends CursorMetaEntity {}

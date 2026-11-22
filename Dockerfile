@@ -5,6 +5,7 @@ RUN node .yarn/releases/yarn-4.18.0.cjs install --immutable
 
 FROM dependencies AS tests
 RUN node .yarn/releases/yarn-4.18.0.cjs workspace @sellgar/outbox build \
+    && node .yarn/releases/yarn-4.18.0.cjs workspace @sellgar/pagination build \
     && node .yarn/releases/yarn-4.18.0.cjs test --runInBand --testPathIgnorePatterns='\.integration[.-]spec\.ts$'
 
 FROM dependencies AS builder
@@ -19,6 +20,8 @@ WORKDIR /app
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/library/sellgar.outbox.library/package.json ./library/sellgar.outbox.library/package.json
 COPY --from=builder --chown=node:node /app/library/sellgar.outbox.library/dist ./library/sellgar.outbox.library/dist
+COPY --from=builder --chown=node:node /app/library/sellgar.pagination.library/package.json ./library/sellgar.pagination.library/package.json
+COPY --from=builder --chown=node:node /app/library/sellgar.pagination.library/dist ./library/sellgar.pagination.library/dist
 COPY --from=builder --chown=node:node /app/dist ./dist
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 USER node

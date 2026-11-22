@@ -4,6 +4,11 @@ imagePullSecrets:
 - name: ghcr-pull
 applicationPort: 8080
 env:
+  PAGINATION_TOKEN_SECRET:
+    valueFrom:
+      secretKeyRef:
+        name: store-pagination
+        key: token-secret
   AMQP_USERNAME:
     valueFrom:
       secretKeyRef:

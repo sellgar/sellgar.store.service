@@ -1,8 +1,10 @@
+import { CursorPagination, CursorOrder } from '@sellgar/pagination';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, ObjectLiteral, SelectQueryBuilder } from 'typeorm';
-import { AccountingRecordModel } from '../model/accounting-record.model';
 import { plainToInstance } from 'class-transformer';
+
+import { AccountingRecordModel } from '../model/accounting-record.model';
 import { StoreProductModel } from '../model/store-product.model';
 import { StoreOfferModel } from '../model/store-offer.model';
 import { ShopSnapshotModel } from '../model/shop-snapshot.model';
@@ -10,7 +12,6 @@ import { ProductSnapshotModel } from '../model/product-snapshot.model';
 import { PriceHistoryModel } from '../model/price-history.model';
 import { StoreProductEntity, StorefrontOfferEntity, StorefrontOfferDetailEntity } from '../entity';
 import { GetAllStoreProductsCommand } from '../service/command/get-all-store-products.command';
-
 import { StoreProductCategoryRepository } from './store-product-category.repository';
 
 @Injectable()
@@ -18,20 +19,17 @@ export class StoreProductQueryRepository {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly categories: StoreProductCategoryRepository,
+    private readonly pagination: CursorPagination,
   ) {}
-  async getAll(query: GetAllStoreProductsCommand) {
-    const builder = this.applyFilters(this.buildStoreProductQuery(), query).addOrderBy(
-      'storeProduct.createdAt',
-      'DESC',
-    );
-    const [rows, count] = await builder.getManyAndCount();
-    await this.loadPrices(rows, this.dataSource.manager);
-    return { data: rows.map((row) => this.toEntity(row)), meta: { totalRows: count } };
+  async getAll(query: Partial<GetAllStoreProductsCommand>) {
+    const page = await this.readPage(this.applyFilters(this.buildStoreProductQuery(), query), query, 'storeProduct');
+    await this.loadPrices(page.items, this.dataSource.manager);
+    return { items: page.items.map((row) => this.toEntity(row)), meta: page.meta };
   }
 
   async getByUuid(
     uuid: string,
-    query: GetAllStoreProductsCommand = {},
+    query: Partial<GetAllStoreProductsCommand> = {},
     manager: EntityManager = this.dataSource.manager,
   ): Promise<StoreProductEntity> {
     const row = await this.applyFilters(this.buildStoreProductQuery(manager), query)
@@ -56,14 +54,12 @@ export class StoreProductQueryRepository {
     return this.getByUuid(row.uuid);
   }
 
-  async getOffers(query: GetAllStoreProductsCommand = {}) {
-    const [rows, count] = await this.applyFilters(this.buildStoreOfferQuery(), query)
-      .addOrderBy('offer.createdAt', 'DESC')
-      .getManyAndCount();
-    return { data: rows.map((row) => this.toOfferEntity(row)), meta: { totalRows: count } };
+  async getOffers(query: Partial<GetAllStoreProductsCommand> = {}) {
+    const page = await this.readPage(this.applyFilters(this.buildStoreOfferQuery(), query), query, 'offer');
+    return { items: page.items.map((row) => this.toOfferEntity(row)), meta: page.meta };
   }
 
-  async getOffer(uuid: string, query: GetAllStoreProductsCommand = {}): Promise<StorefrontOfferDetailEntity> {
+  async getOffer(uuid: string, query: Partial<GetAllStoreProductsCommand> = {}): Promise<StorefrontOfferDetailEntity> {
     const row = await this.applyFilters(this.buildStoreOfferQuery(), query)
       .andWhere('offer.uuid = :uuid', { uuid })
       .getOne();
@@ -83,7 +79,33 @@ export class StoreProductQueryRepository {
     );
   }
 
-  private applyFilters<T extends ObjectLiteral>(builder: SelectQueryBuilder<T>, query: GetAllStoreProductsCommand) {
+  private readPage<T extends ObjectLiteral>(
+    builder: SelectQueryBuilder<T>,
+    query: Partial<GetAllStoreProductsCommand>,
+    alias: 'storeProduct' | 'offer',
+  ) {
+    const { limit, nextToken, offset, ...filters } = query;
+    const codes = (value: string | string[] | undefined) =>
+      value === undefined ? undefined : [...new Set(Array.isArray(value) ? value : [value])].sort();
+    const order: CursorOrder[] = [
+      { expression: alias + '.createdAt', direction: 'DESC', type: 'timestamp' },
+      { expression: alias + '.uuid', direction: 'ASC', type: 'uuid' },
+    ];
+    return this.pagination.read(
+      builder,
+      { limit, nextToken, offset },
+      {
+        scope: 'store.' + alias + '.list',
+        filters: { ...filters, categoryUuid: codes(filters.categoryUuid), brandCode: codes(filters.brandCode) },
+        order,
+      },
+    );
+  }
+
+  private applyFilters<T extends ObjectLiteral>(
+    builder: SelectQueryBuilder<T>,
+    query: Partial<GetAllStoreProductsCommand>,
+  ) {
     const fields = [
       ['shopUuid', 'storeProduct.shopUuid'],
       ['productUuid', 'storeProduct.productUuid'],
@@ -135,7 +157,7 @@ export class StoreProductQueryRepository {
 
   private applyInventoryFilters<T extends ObjectLiteral>(
     builder: SelectQueryBuilder<T>,
-    query: GetAllStoreProductsCommand,
+    query: Partial<GetAllStoreProductsCommand>,
     alias: string,
   ): void {
     const fields = [

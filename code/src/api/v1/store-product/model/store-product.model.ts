@@ -1,5 +1,4 @@
 import { Unique } from 'typeorm';
-import { StoreProductCategoryModel } from './store-product-category.model';
 import {
   Column,
   CreateDateColumn,
@@ -13,15 +12,17 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+import { StoreProductCategoryModel } from './store-product-category.model';
 import { StoreOfferModel } from './store-offer.model';
 import { StoreProductStatus } from '../enum/store-product-status.enum';
-
 import { ProductSnapshotModel } from './product-snapshot.model';
 import { ShopSnapshotModel } from './shop-snapshot.model';
 
 @Index(['uuid', 'productUuid'], { unique: true })
 @Entity('store_product')
 @Unique('store_product_uuid_shop_uq', ['uuid', 'shopUuid'])
+@Index('store_product_cursor_idx', { synchronize: false })
+@Index('store_product_shop_cursor_idx', { synchronize: false })
 export class StoreProductModel {
   @OneToMany(() => StoreProductCategoryModel, (link) => link.storeProduct)
   categoryLinks: StoreProductCategoryModel[];

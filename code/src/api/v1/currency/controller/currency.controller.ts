@@ -1,3 +1,4 @@
+import { CursorQueryDto } from '@sellgar/pagination';
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
@@ -10,8 +11,8 @@ export class CurrencyController {
   constructor(private readonly currencyService: CurrencyService) {}
 
   @MessagePattern({ cmd: 'currency.findAll' })
-  findAll() {
-    return this.currencyService.findAll();
+  findAll(@Payload() query: CursorQueryDto) {
+    return this.currencyService.findAll(query);
   }
 
   @MessagePattern({ cmd: 'currency.findByUuid' })

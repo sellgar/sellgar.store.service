@@ -1,5 +1,6 @@
 import { Expose, Type } from 'class-transformer';
-import { ValidateNested, IsArray } from 'class-validator';
+import { IsDefined, ValidateNested, IsArray } from 'class-validator';
+
 import { StoreProductEntity } from './store-product.entity';
 import { MetaEntity } from './meta.entity';
 
@@ -8,9 +9,10 @@ export class StoreProductResultEntity {
   @IsArray()
   @ValidateNested()
   @Type(() => StoreProductEntity)
-  data: StoreProductEntity[];
+  items: StoreProductEntity[];
 
   @Expose()
+  @IsDefined()
   @ValidateNested()
   @Type(() => MetaEntity)
   meta: MetaEntity;

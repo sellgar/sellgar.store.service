@@ -1,5 +1,6 @@
 import { Expose, Type } from 'class-transformer';
-import { ValidateNested, IsArray } from 'class-validator';
+import { IsDefined, ValidateNested, IsArray } from 'class-validator';
+
 import { StorefrontOfferEntity } from './storefront-offer.entity';
 import { MetaEntity } from './meta.entity';
 
@@ -8,9 +9,10 @@ export class StorefrontOfferResultEntity {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => StorefrontOfferEntity)
-  data: StorefrontOfferEntity[];
+  items: StorefrontOfferEntity[];
 
   @Expose()
+  @IsDefined()
   @ValidateNested()
   @Type(() => MetaEntity)
   meta: MetaEntity;

@@ -2,3 +2,7 @@
 	path = code/library/sellgar.outbox.library
 	url = git@github.com:pyatakovvg/sellgar.outbox.library.git
 	branch = development
+[submodule "code/library/sellgar.pagination.library"]
+	path = code/library/sellgar.pagination.library
+	url = git@github.com:sellgar/sellgar.pagination.library.git
+	branch = development

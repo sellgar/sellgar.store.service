@@ -1,3 +1,4 @@
+import { CursorQueryDto } from '@sellgar/pagination';
 import { Expose, Transform } from 'class-transformer';
 import {
   IsUUID,
@@ -13,11 +14,12 @@ import {
   Validate,
   ValidateIf,
 } from 'class-validator';
+
 import { StoreProductStatus } from '../../enum/store-product-status.enum';
 import { StoreOfferStatus } from '../../enum/store-offer-status.enum';
 import { RangeMaximumConstraint } from './validation/range-maximum.constraint';
 
-export class GetAllStoreProductsCommand {
+export class GetAllStoreProductsCommand extends CursorQueryDto {
   @Expose()
   @IsOptional()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))

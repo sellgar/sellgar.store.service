@@ -1,3 +1,4 @@
+import { CursorPagination, CursorQueryDto } from '@sellgar/pagination';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
@@ -6,29 +7,28 @@ import { DataSource } from 'typeorm';
 
 import { CreateCurrencyDto } from './dto/create-currency.dto';
 import { UpdateCurrencyDto } from './dto/update-currency.dto';
-
 import { CurrencyEntity } from '../currency.entity';
 import { CurrencyModel } from '../currency.model';
 
 @Injectable()
 export class CurrencyRepository {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly pagination: CursorPagination,
+  ) {}
 
-  count() {
-    return this.dataSource.createQueryBuilder(CurrencyModel, 'currency').getCount();
-  }
-
-  async findAll() {
-    const result = await this.dataSource
-      .createQueryBuilder(CurrencyModel, 'currency')
-      .orderBy('currency.order', 'ASC')
-      .getMany();
-
-    const resultInstance = result.map((entity) => this.toEntity(entity));
-
-    await Promise.all(resultInstance.map((entity) => validateOrReject(entity)));
-
-    return resultInstance;
+  async findAll(query: Partial<CursorQueryDto> = {}) {
+    const page = await this.pagination.read(this.dataSource.createQueryBuilder(CurrencyModel, 'currency'), query, {
+      scope: 'store.currency.list',
+      filters: {},
+      order: [
+        { expression: 'currency.order', direction: 'ASC', type: 'integer' },
+        { expression: 'currency.code', direction: 'ASC', type: 'text' },
+      ],
+    });
+    const items = page.items.map((entity) => this.toEntity(entity));
+    await Promise.all(items.map((entity) => validateOrReject(entity)));
+    return { items, meta: page.meta };
   }
 
   async findByCode(code: string) {

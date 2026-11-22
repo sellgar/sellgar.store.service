@@ -18,6 +18,7 @@ import { VariantSnapshotModel } from './variant-snapshot.model';
 
 @Index(['storeProductUuid', 'variantUuid'], { unique: true })
 @Entity('store_offer')
+@Index('store_offer_cursor_idx', { synchronize: false })
 export class StoreOfferModel {
   @Generated('uuid')
   @PrimaryColumn('uuid', { name: 'uuid', default: () => 'gen_random_uuid()' })

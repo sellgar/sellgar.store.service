@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validateOrReject } from 'class-validator';
+
 import { StoreProductResultEntity, StorefrontOfferResultEntity } from '../entity';
 import { StoreProductRepository } from '../repository/store-product.repository';
 import { StoreProductQueryRepository } from '../repository/store-product-query.repository';
@@ -22,7 +23,7 @@ export class StoreProductService {
     private readonly inventory: InventoryRepository,
     private readonly commands: CommandFactory,
   ) {}
-  async getAll(input: GetAllStoreProductsCommand = {}) {
+  async getAll(input: Partial<GetAllStoreProductsCommand> = {}) {
     const query = await this.commands.create(GetAllStoreProductsCommand, input);
     const result = plainToInstance(StoreProductResultEntity, await this.queries.getAll(query), {
       excludeExtraneousValues: true,
@@ -30,7 +31,7 @@ export class StoreProductService {
     await validateOrReject(result);
     return result;
   }
-  async getByUuid(uuid: string, input: GetAllStoreProductsCommand = {}) {
+  async getByUuid(uuid: string, input: Partial<GetAllStoreProductsCommand> = {}) {
     const query = await this.commands.create(GetAllStoreProductsCommand, input);
     return this.queries.getByUuid(uuid, query);
   }
@@ -38,7 +39,7 @@ export class StoreProductService {
     return this.queries.getByRecordUuid(recordUuid);
   }
 
-  async getOffers(input: GetAllStoreProductsCommand = {}) {
+  async getOffers(input: Partial<GetAllStoreProductsCommand> = {}) {
     const query = await this.commands.create(GetAllStoreProductsCommand, input);
     const result = plainToInstance(StorefrontOfferResultEntity, await this.queries.getOffers(query), {
       excludeExtraneousValues: true,
@@ -46,7 +47,7 @@ export class StoreProductService {
     await validateOrReject(result);
     return result;
   }
-  async getOffer(uuid: string, input: GetAllStoreProductsCommand = {}) {
+  async getOffer(uuid: string, input: Partial<GetAllStoreProductsCommand> = {}) {
     const query = await this.commands.create(GetAllStoreProductsCommand, input);
     return this.queries.getOffer(uuid, query);
   }

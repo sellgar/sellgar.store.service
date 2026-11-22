@@ -1,28 +1,19 @@
+import { CursorQueryDto } from '@sellgar/pagination';
 import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validateOrReject } from 'class-validator';
 
 import { CreateCurrencyDto } from './dto/create-currency.dto';
 import { UpdateCurrencyDto } from './dto/update-currency.dto';
-
 import { CurrencyRepository } from '../repository/currency.repository';
-import { CurrencyResultEntity } from '../currency.entity';
+import { CurrencyResultEntity } from '../currency-result.entity';
 
 @Injectable()
 export class CurrencyService {
   constructor(private readonly currencyRepository: CurrencyRepository) {}
 
-  async findAll() {
-    const result = await Promise.all([this.currencyRepository.findAll(), this.currencyRepository.count()]).then(
-      ([data, count]) => {
-        return {
-          data,
-          meta: {
-            totalRows: count,
-          },
-        };
-      },
-    );
+  async findAll(query: Partial<CursorQueryDto> = {}) {
+    const result = await this.currencyRepository.findAll(query);
 
     const resultInstance = plainToInstance(CurrencyResultEntity, result, {
       strategy: 'excludeAll',
