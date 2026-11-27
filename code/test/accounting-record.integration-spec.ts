@@ -697,6 +697,53 @@ describe('Accounting records in PostgreSQL', () => {
     expect((await service.getOffers({ productUuid: fixture.productUuid })).items).toEqual([]);
   });
 
+  it('excludes catalog-archived variants before pagination even when Store offers are still active', async () => {
+    const fixture = await createFilterFixture();
+    const firstPage = await service.getOffers({ productUuid: fixture.productUuid, limit: 1 });
+    const archived = firstPage.items[0];
+    const remaining = fixture.offers.find((offer) => offer.uuid !== archived.uuid)!;
+    await source.query("UPDATE variant_snapshot SET status='archived' WHERE variant_uuid=$1", [archived.variantUuid]);
+
+    const page = await service.getOffers({ productUuid: fixture.productUuid, limit: 1 });
+    expect(page.items.map((offer) => offer.uuid)).toEqual([remaining.uuid]);
+    expect(page.meta.nextToken).toBeNull();
+    await expect(service.getOffer(archived.uuid)).rejects.toMatchObject({ status: 404 });
+    const detail = await service.getOffer(remaining.uuid);
+    expect(detail.siblingOffers.map((offer) => offer.uuid)).toEqual([remaining.uuid]);
+    expect((await service.getByUuid(fixture.uuid)).offers.map((offer) => offer.uuid)).toEqual([remaining.uuid]);
+    expect(
+      (await service.getAll({ productUuid: fixture.productUuid })).items[0].offers.map((offer) => offer.uuid),
+    ).toEqual([remaining.uuid]);
+    expect((await service.getAll({ search: archived.records[0].article })).items).toEqual([]);
+
+    const snapshot = await service.getSnapshot(fixture.uuid);
+    expect(snapshot.offers).toHaveLength(2);
+    expect(snapshot.offers.every((offer) => offer.status === StoreOfferStatus.ACTIVE)).toBe(true);
+    await source.query("UPDATE variant_snapshot SET status='archived' WHERE variant_uuid=$1", [remaining.variantUuid]);
+    expect((await service.getByUuid(fixture.uuid)).offers).toEqual([]);
+    expect((await service.getOffers({ productUuid: fixture.productUuid })).items).toEqual([]);
+  });
+
+  it('excludes catalog-archived products while preserving disabled products and full synchronization snapshots', async () => {
+    const fixture = await createFilterFixture();
+    await source.query("UPDATE product_snapshot SET status='disabled' WHERE product_uuid=$1", [fixture.productUuid]);
+    await source.query("UPDATE variant_snapshot SET status='disabled' WHERE product_uuid=$1", [fixture.productUuid]);
+    expect((await service.getByUuid(fixture.uuid)).offers).toHaveLength(2);
+    expect((await service.getOffers({ productUuid: fixture.productUuid })).items).toHaveLength(2);
+    await source.query("UPDATE product_snapshot SET status='archived' WHERE product_uuid=$1", [fixture.productUuid]);
+
+    expect((await service.getAll({ productUuid: fixture.productUuid })).items).toEqual([]);
+    expect((await service.getOffers({ productUuid: fixture.productUuid })).items).toEqual([]);
+    await expect(service.getByUuid(fixture.uuid)).rejects.toMatchObject({ status: 404 });
+    await expect(service.getOffer(fixture.offers[0].uuid)).rejects.toMatchObject({ status: 404 });
+    const snapshot = await service.getSnapshot(fixture.uuid);
+    expect(snapshot.status).toBe(StoreProductStatus.ACTIVE);
+    expect(snapshot.offers).toHaveLength(2);
+    expect((await service.getByRecordUuid(fixture.offers[0].records[0].uuid)).offers).toHaveLength(2);
+    const snapshotsPage = await service.getSnapshots({ limit: 100 });
+    expect(snapshotsPage.items.find((item) => item.uuid === fixture.uuid)?.offers).toHaveLength(2);
+  });
+
   it('hides an archived Store root while keeping full snapshots and archive events', async () => {
     const fixture = await createFilterFixture();
     const archived = await service.archive({

@@ -158,8 +158,13 @@ store.product.created, store.product.updated и store.product.archived.
 Payload Store Product имеет schemaVersion=3, Inventory — schemaVersion=2.
 Для остатков pattern store.inventory.updated с aggregateType=record_inventory:
 payload содержит recordUuid и текущие quantity/reserved/available/version.
-Обычные list и detail исключают собственный архив Store. Политика storefront
-добавляет ограничения показа и наличия.
+Обычные list и detail исключают собственный архив Store и архив каталога по локальным
+`product_snapshot.status` / `variant_snapshot.status` непосредственно в SQL до пагинации.
+Архивный Product исключает Store Product целиком, архивный Variant — связанное предложение,
+даже если его собственный статус Store ещё активен. Неархивный Store Product может остаться
+с пустым `offers`. Полные внутренние снимки для синхронизации сохраняют архивные связи.
+Для соединений используются существующие UUID-индексы; запрос к базе Product не требуется.
+Политика storefront добавляет ограничения показа и наличия.
 
 При архивировании Product Store архивирует его StoreProduct и все StoreOffer во всех
 магазинах; при архивировании Variant — только соответствующие StoreOffer. Применение

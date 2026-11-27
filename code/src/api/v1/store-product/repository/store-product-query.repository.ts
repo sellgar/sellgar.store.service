@@ -9,6 +9,7 @@ import { StoreProductModel } from '../model/store-product.model';
 import { StoreOfferModel } from '../model/store-offer.model';
 import { ShopSnapshotModel } from '../model/shop-snapshot.model';
 import { ProductSnapshotModel } from '../model/product-snapshot.model';
+import { VariantSnapshotModel } from '../model/variant-snapshot.model';
 import { PriceHistoryModel } from '../model/price-history.model';
 import { StoreProductStatus } from '../enum/store-product-status.enum';
 import { StoreOfferStatus } from '../enum/store-offer-status.enum';
@@ -227,7 +228,17 @@ export class StoreProductQueryRepository {
       { excludeExtraneousValues: true },
     );
   }
+
   private buildStoreProductQuery(manager: EntityManager = this.dataSource.manager, snapshot = false) {
+    const catalogVariant = manager
+      .createQueryBuilder()
+      .subQuery()
+      .select('1')
+      .from(VariantSnapshotModel, 'catalogVariant')
+      .where('catalogVariant.productUuid = offer.productUuid')
+      .andWhere('catalogVariant.variantUuid = offer.variantUuid')
+      .andWhere('catalogVariant.status != :archivedCatalogStatus');
+
     const builder = manager
       .createQueryBuilder(StoreProductModel, 'storeProduct')
       .leftJoinAndMapOne(
@@ -246,9 +257,10 @@ export class StoreProductQueryRepository {
       .leftJoinAndSelect(
         'storeProduct.offers',
         'offer',
-        snapshot ? undefined : 'offer.status != :archivedOfferStatus',
+        snapshot ? undefined : `offer.status != :archivedOfferStatus AND EXISTS ${catalogVariant.getQuery()}`,
         {
           archivedOfferStatus: StoreOfferStatus.ARCHIVED,
+          archivedCatalogStatus: 'archived',
         },
       )
       .leftJoinAndSelect('offer.variantSnapshot', 'variantSnapshot')
@@ -267,9 +279,11 @@ export class StoreProductQueryRepository {
       .addOrderBy('clarifications.position', 'ASC')
       .addOrderBy('offer.createdAt', 'ASC');
     if (!snapshot)
-      builder.andWhere('storeProduct.status != :archivedProductStatus', {
-        archivedProductStatus: StoreProductStatus.ARCHIVED,
-      });
+      builder
+        .andWhere('storeProduct.status != :archivedProductStatus', {
+          archivedProductStatus: StoreProductStatus.ARCHIVED,
+        })
+        .andWhere('productSnapshot.status != :archivedCatalogStatus', { archivedCatalogStatus: 'archived' });
     return builder;
   }
 
@@ -286,6 +300,8 @@ export class StoreProductQueryRepository {
         'productSnapshot.productUuid = offer.productUuid',
       )
       .leftJoinAndSelect('offer.variantSnapshot', 'variantSnapshot')
+      .andWhere('productSnapshot.status != :archivedCatalogStatus', { archivedCatalogStatus: 'archived' })
+      .andWhere('variantSnapshot.status != :archivedCatalogStatus')
       .leftJoinAndSelect('offer.records', 'records')
       .leftJoinAndMapOne(
         'records.currentPrice',
